@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 
 import requests
 from dateutil.parser import parse as parse_time
+os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", "/app/.cache/ms-playwright")
 from playwright.async_api import async_playwright
 
 # ====== KONFIGURACJA ======
