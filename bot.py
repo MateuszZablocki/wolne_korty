@@ -114,9 +114,10 @@ async def scrape_day(page, date):
 
     # {kort: [godziny]}
     free_slots = defaultdict(list)
-    court_map = {}
 
     # Build court column index -> court number mapping from header row
+    court_map = {}
+    total_courts = 0
     for row in rows:
         headers = await row.query_selector_all("th")
         if not headers:
@@ -124,12 +125,17 @@ async def scrape_day(page, date):
         for idx, th in enumerate(headers[1:], start=1):
             text = (await th.inner_text()).strip()
             if "Kort" in text:
+                total_courts += 1
                 parts = text.split()
                 for part in parts:
                     if part.isdigit():
-                        court_map[idx] = int(part)
+                        court_map[idx - 1] = int(part)  # 0-based for courts
                         break
-        break
+        if total_courts:
+            break
+
+    # Track rowspans for court columns only (0..total_courts-1)
+    active_rowspans = [0] * total_courts
 
     for row in rows:
         cells = await row.query_selector_all("td")
@@ -146,11 +152,38 @@ async def scrape_day(page, date):
         if not (prime_start_min <= hour_min < prime_end_min):
             continue
 
-        for col_idx, cell in enumerate(cells[1:], start=1):
+        # Assign cells to court columns respecting rowspan/colspan
+        col_cursor = 0
+        for cell in cells[1:]:
+            # Skip columns occupied by rowspan from previous rows
+            while col_cursor < total_courts and active_rowspans[col_cursor] > 0:
+                col_cursor += 1
+
+            if col_cursor >= total_courts:
+                break
+
             text = (await cell.inner_text()).strip()
-            if "Rezerwuj" in text:
-                court_idx = court_map.get(col_idx, col_idx)
-                free_slots[court_idx].append(hour_min)
+            rowspan_attr = await cell.get_attribute("rowspan")
+            colspan_attr = await cell.get_attribute("colspan")
+            rowspan = int(rowspan_attr) if rowspan_attr and rowspan_attr.isdigit() else 1
+            colspan = int(colspan_attr) if colspan_attr and colspan_attr.isdigit() else 1
+
+            for offset in range(colspan):
+                col_idx = col_cursor + offset
+                if col_idx >= total_courts:
+                    continue
+                if "Rezerwuj" in text:
+                    court_idx = court_map.get(col_idx, col_idx + 1)
+                    free_slots[court_idx].append(hour_min)
+                if rowspan > 1:
+                    active_rowspans[col_idx] = max(active_rowspans[col_idx], rowspan - 1)
+
+            col_cursor += colspan
+
+        # Decrement active rowspans for next row
+        for i in range(total_courts):
+            if active_rowspans[i] > 0:
+                active_rowspans[i] -= 1
 
     return free_slots
 
