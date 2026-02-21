@@ -148,31 +148,29 @@ def find_continuous_slots(date, free_slots):
         hours = sorted(hours)
         streak_start = hours[0]
         streak_len = 1
-        found_for_court = False
+        best_start = None
+        best_len = 0
 
         for h in hours[1:]:
             if h - (streak_start + (streak_len - 1) * SLOT_MINUTES) == SLOT_MINUTES:
                 streak_len += 1
             else:
+                if streak_len >= required_slots and streak_len > best_len:
+                    best_start = streak_start
+                    best_len = streak_len
                 streak_start = h
                 streak_len = 1
 
-            if streak_len >= required_slots:
-                slot_id = (
-                    f"{date.strftime('%Y-%m-%d')} | "
-                    f"{format_minutes(streak_start)}–"
-                    f"{format_minutes(streak_start + MIN_FREE_MINUTES)} | "
-                    f"kort {court}"
-                )
-                found.append(slot_id)
-                found_for_court = True
-                break
+        if streak_len >= required_slots and streak_len > best_len:
+            best_start = streak_start
+            best_len = streak_len
 
-        if not found_for_court and streak_len >= required_slots:
+        if best_start is not None:
+            end_minutes = best_start + best_len * SLOT_MINUTES
             slot_id = (
                 f"{date.strftime('%Y-%m-%d')} | "
-                f"{format_minutes(streak_start)}–"
-                f"{format_minutes(streak_start + MIN_FREE_MINUTES)} | "
+                f"{format_minutes(best_start)}–"
+                f"{format_minutes(end_minutes)} | "
                 f"kort {court}"
             )
             found.append(slot_id)
