@@ -204,7 +204,7 @@ async def main():
         p = await async_playwright().start()
         browser = await p.chromium.launch(
             headless=not args.headful,
-            args=["--disable-crashpad"],
+            args=["--disable-crashpad", "--no-sandbox", "--disable-dev-shm-usage"],
         )
         page = await browser.new_page(viewport={"width": 1024, "height": 768})
 
