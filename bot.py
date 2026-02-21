@@ -114,6 +114,22 @@ async def scrape_day(page, date):
 
     # {kort: [godziny]}
     free_slots = defaultdict(list)
+    court_map = {}
+
+    # Build court column index -> court number mapping from header row
+    for row in rows:
+        headers = await row.query_selector_all("th")
+        if not headers:
+            continue
+        for idx, th in enumerate(headers[1:], start=1):
+            text = (await th.inner_text()).strip()
+            if "Kort" in text:
+                parts = text.split()
+                for part in parts:
+                    if part.isdigit():
+                        court_map[idx] = int(part)
+                        break
+        break
 
     for row in rows:
         cells = await row.query_selector_all("td")
@@ -130,9 +146,10 @@ async def scrape_day(page, date):
         if not (prime_start_min <= hour_min < prime_end_min):
             continue
 
-        for court_idx, cell in enumerate(cells[1:], start=1):
+        for col_idx, cell in enumerate(cells[1:], start=1):
             text = (await cell.inner_text()).strip()
             if "Rezerwuj" in text:
+                court_idx = court_map.get(col_idx, col_idx)
                 free_slots[court_idx].append(hour_min)
 
     return free_slots
